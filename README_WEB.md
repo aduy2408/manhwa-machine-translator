@@ -1,7 +1,15 @@
 # Korean Manhwa Translator - Web Version
 
-A modern web-based application for detecting and translating Korean text in manhwa (webtoon) images. Features a FastAPI backend and React frontend for seamless image processing and batch translation.
+A modern web-based application for detecting and translating Korean text in manhwa (webtoon) image
 
+## USE IMAGE ASSISTANT DOWNLOADER TO INSTALL ALL IMAGES OF A MANHWA CHAPTER FRON WFWF 
+## USE IMAGE ASSISTANT DOWNLOADER TO INSTALL ALL IMAGES OF A MANHWA CHAPTER FRON WFWF 
+## USE IMAGE ASSISTANT DOWNLOADER TO INSTALL ALL IMAGES OF A MANHWA CHAPTER FRON WFWF 
+
+
+
+## YOU CAN ALSO TRY TO USE A DIFFERENT OCR MODEL(THIS REPO USES KOREAN PADDLE OCR), JUST CHANGE THE MODEL NAME FOR RECOGNIZING TEXT, LIKE JAPANESE, IF PADDLE HAS THAT MODEL
+## YOU CAN ALSO TRY TO USE A DIFFERENT OCR MODEL(THIS REPO USES KOREAN PADDLE OCR), JUST CHANGE THE MODEL NAME FOR RECOGNIZING TEXT, LIKE JAPANESE, IF PADDLE HAS THAT MODEL
 ## Overview
 
 The web version provides a complete solution for Korean text extraction and translation with:
