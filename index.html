@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Korean Manhwa Translator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+        }
+
+        .container {
+            margin: 1rem auto;
+            display: flex;
+            gap: 1rem;
+            padding: 0 1rem;
+            height: calc(100vh - 180px);
+        }
+
+        .sidebar {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            width: 220px;
+            flex-shrink: 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .sidebar h2 {
+            font-size: 0.95rem;
+            margin: 0;
+            color: #333;
+            font-weight: 700;
+        }
+
+        .sidebar > div {
+            font-size: 0.85rem;
+        }
+
+        .sidebar > div label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+            color: #666;
+            font-size: 0.8rem;
+        }
+
+        .upload-label {
+            display: block;
+            padding: 0.6rem;
+            border: 2px dashed #667eea;
+            border-radius: 6px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #667eea;
+            font-weight: 500;
+            font-size: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-label:hover {
+            background: #f0f4ff;
+            border-color: #764ba2;
+        }
+
+        .upload-label input {
+            display: none;
+        }
+
+        .process-btn {
+            width: 100%;
+            padding: 0.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.75rem;
+            margin-top: 0.3rem;
+        }
+
+        .process-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .process-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 0.5rem;
+            padding: 0.6rem;
+            background: #f9f9f9;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: #666;
+            max-height: 100px;
+            overflow-y: auto;
+            line-height: 1.3;
+        }
+
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .detected-texts {
+            margin-top: 0.5rem;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 0.75rem;
+        }
+
+        .detected-texts h3 {
+            font-size: 0.8rem;
+            margin: 0 0 0.3rem 0;
+            color: #555;
+        }
+
+        .detected-texts ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .detected-texts li {
+            padding: 0.3rem;
+            background: #f9f9f9;
+            border-left: 2px solid #667eea;
+            border-radius: 2px;
+            margin-bottom: 0.3rem;
+            font-size: 0.7rem;
+        }
+
+        .korean {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .translation {
+            color: #666;
+            font-style: italic;
+            margin-top: 0.1rem;
+        }
+
+        .preview {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 1rem;
+            flex: 1;
+        }
+
+        .preview::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .preview::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .preview::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .preview::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .all-images {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .image-result {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .image-result img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .image-size {
+            color: #999;
+            font-size: 0.85rem;
+        }
+
+        .placeholder {
+            color: #999;
+            text-align: center;
+            font-size: 1rem;
+            padding: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                flex-direction: column;
+                height: auto;
+            }
+
+            .sidebar {
+                width: 100%;
+            }
+
+            .preview {
+                min-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Korean Manhwa Translator</h1>
+        <p>Upload Korean comic images to translate text automatically</p>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <h2>Process</h2>
+            
+            <div>
+                <label>Upload Files</label>
+                <label class="upload-label">
+                    <input type="file" id="fileInput" multiple accept="image/*">
+                    <span>Select</span>
+                </label>
+                <button class="process-btn" id="processBtn" disabled>Process</button>
+            </div>
+
+            <div style="border-top: 1px solid #eee; padding-top: 0.8rem;">
+                <label>Folder Path</label>
+                <input type="text" id="folderPathInput" placeholder="/path" style="width: 100%; padding: 0.4rem; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 0.4rem; font-size: 0.75rem;">
+                <button class="process-btn" id="processFolderBtn">Process Folder</button>
+            </div>
+
+            <div class="status" id="status"></div>
+        </div>
+
+        <div class="preview" id="preview">
+            <div class="placeholder">Select and upload images to see results</div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000';
+        let files = [];
+        let results = [];
+        let currentImageIndex = 0;
+        let translations = {};
+
+        const fileInput = document.getElementById('fileInput');
+        const processBtn = document.getElementById('processBtn');
+        const folderPathInput = document.getElementById('folderPathInput');
+        const processFolderBtn = document.getElementById('processFolderBtn');
+        const status = document.getElementById('status');
+        const preview = document.getElementById('preview');
+        const resultsInfo = document.getElementById('resultsInfo');
+
+        fileInput.addEventListener('change', (e) => {
+            files = Array.from(e.target.files);
+            processBtn.disabled = files.length === 0;
+            updateStatus(`${files.length} file(s) selected`, 'info');
+        });
+
+        processBtn.addEventListener('click', processImages);
+        processFolderBtn.addEventListener('click', processFolderPath);
+
+        async function processImages() {
+            if (files.length === 0) {
+                updateStatus('No files selected', 'error');
+                return;
+            }
+
+            processBtn.disabled = true;
+            updateStatus('Processing...', 'loading');
+            preview.innerHTML = '<div class="placeholder">Processing...</div>';
+
+            try {
+                const formData = new FormData();
+                files.forEach(file => {
+                    formData.append('files', file);
+                });
+
+                const response = await fetch(`${API_URL}/batch-process`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Processing failed');
+                }
+
+                const data = await response.json();
+                results = data.results;
+                translations = data.translations;
+                displayAllImages();
+                updateStatus(`✓ Processed ${results.length} images`, 'success');
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                processBtn.disabled = false;
+            }
+        }
+
+        function displayAllImages() {
+            if (results.length === 0) {
+                preview.innerHTML = '<div class="placeholder">No images to display</div>';
+                return;
+            }
+
+            let html = '<div class="all-images">';
+            results.forEach((result, idx) => {
+                html += `
+                    <div class="image-result">
+                        <img src="${result.image}" alt="Image ${idx + 1}">
+                        <p class="image-size">Image ${idx + 1}: ${result.image_shape[1]} × ${result.image_shape[0]}</p>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            preview.innerHTML = html;
+        }
+
+        function updateStatus(message, type = 'info') {
+            status.textContent = message;
+            status.className = `status ${type === 'info' ? '' : type}`;
+        }
+
+        async function processFolderPath() {
+            const folderPath = folderPathInput.value.trim();
+            if (!folderPath) {
+                updateStatus('Please enter a folder path', 'error');
+                return;
+            }
+
+            processFolderBtn.disabled = true;
+            updateStatus('Processing folder...', 'loading');
+            preview.innerHTML = '<div class="placeholder">Processing...</div>';
+
+            try {
+                const response = await fetch(`${API_URL}/process-folder?folder_path=${encodeURIComponent(folderPath)}`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Processing failed');
+                }
+
+                const data = await response.json();
+                results = data.results;
+                translations = data.translations;
+
+                if (results.length === 0) {
+                    updateStatus('✓ ' + (data.message || 'No images to display'), 'success');
+                    preview.innerHTML = '<div class="placeholder">No images found</div>';
+                } else {
+                    updateStatus(`✓ Processed ${results.length} images`, 'success');
+                    displayAllImages();
+                }
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                processFolderBtn.disabled = false;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
