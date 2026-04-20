@@ -15,7 +15,7 @@ A web-based tool to automatically scrape, detect, translate, read, manages Korea
 
 ## Features & Tech Stack
 - **Dashboard**: library management for series.
-    - **Scraper**: Uses **DrissionPage**.(Chromedriver would get flagged)
+- **Scraper**: Uses **DrissionPage**.(Chromedriver would get flagged)
 - **OCR Engine**: Uses **PaddleOCR (Korean)** for text detection + recognition.
 - **Translation**: Uses **Google Gemini AI** for high-quality, context-aware translations.(2.5 Flash)
 - **Processing**: **Celery** with **Redis** handles OCR & Translation in the background.
