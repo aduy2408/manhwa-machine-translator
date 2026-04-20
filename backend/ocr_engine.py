@@ -18,7 +18,8 @@ class OCREngine:
         try:
             print("Initializing OCR Engine with korean_PP-OCRv5_mobile_rec model...")
             self.model = TextRecognition(
-                model_name="korean_PP-OCRv5_mobile_rec"
+                model_name="korean_PP-OCRv5_mobile_rec",
+                device = "gpu"
             )
             self.last_raw_results = None
             print("OCR Engine initialized successfully")

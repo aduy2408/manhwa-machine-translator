@@ -1,11 +1,18 @@
-paddleocr
-paddlepaddle
+paddleocr[all]
+numpy
+# paddlepaddlec
 protobuf==3.20.0
 opencv-python-headless
-opencv-python
+opencv-python==4.10.0.84
 google-generativeai
 Pillow
-numpy
 python-dotenv
 fastapi
 uvicorn[standard]
+natsort
+celery[redis]
+sqlalchemy
+aiofiles
+python-multipart
+DrissionPage
+ddddocr

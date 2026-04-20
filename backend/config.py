@@ -22,13 +22,15 @@ RECTANGLE_PADDING = 0  # Padding around detected region in pixels
 
 # Detection & Recognition Confidence Thresholds
 DETECTION_CONFIDENCE_THRESHOLD = 0.5 # Filter detection bboxes with dt_scores > this threshold
-RECOGNITION_CONFIDENCE_THRESHOLD = 0.8  # Filter recognized text with rec_score > this threshold
+RECOGNITION_CONFIDENCE_THRESHOLD = 0.6  # Filter recognized text with rec_score > this threshold
 
 # Text Replacement Configuration
-TEXT_FONT_SCALE = 0.5  # Text size (0.3=small, 0.5=default, 0.8=medium, 1.2=large, 1.5=extra large)
-TEXT_FONT_THICKNESS = 1  # Text thickness
-TEXT_FONT_COLOR = (0, 0, 0)  # BGR: Black text
-TEXT_LINE_HEIGHT = 25  # Space between lines
+CUSTOM_FONT_PATH = "/mnt/data/manhwa-machine-translator/CCAskForMercy-Regular.ttf"
+TEXT_FONT_SIZE = 22  # Font size in pixels
+TEXT_FONT_COLOR = (0, 0, 0)  # RGB: Black text
+TEXT_STROKE_WIDTH = 3  # Thick outline so text cuts through arbitrary backgrounds
+TEXT_STROKE_COLOR = (255, 255, 255)  # RGB: White outline
+TEXT_LINE_HEIGHT_MULTIPLIER = 1.0  # Line height multiplier
 
 # Last opened path storage
 LAST_OPENED_PATH_FILE = ".last_opened_path.json"

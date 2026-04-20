@@ -5,13 +5,16 @@ import numpy as np
 import os
 from typing import Optional, Tuple, List, Dict
 from natsort import natsorted
+from PIL import Image, ImageDraw, ImageFont
 from config import (
     RECTANGLE_PADDING,
     MAX_IMAGE_SIZE,
-    TEXT_FONT_SCALE,
-    TEXT_FONT_THICKNESS,
+    CUSTOM_FONT_PATH,
+    TEXT_FONT_SIZE,
     TEXT_FONT_COLOR,
-    TEXT_LINE_HEIGHT,
+    TEXT_STROKE_WIDTH,
+    TEXT_STROKE_COLOR,
+    TEXT_LINE_HEIGHT_MULTIPLIER,
 )
 
 
@@ -340,10 +343,10 @@ class ImageProcessor:
         translations: dict,
     ) -> bool:
         """
-        Draw translations on detected text regions.
+        Draw translations on detected text regions using PIL for custom typography.
         
         Args:
-            image: Image to modify (will be modified in-place)
+            image: Image to modify (will be modified in-place, BGR format)
             polygons: Detected polygons from text detection
             recognized_texts: List of dicts with 'text' and 'confidence' keys
             translations: Dictionary mapping original Korean text -> translated text
@@ -353,136 +356,142 @@ class ImageProcessor:
         """
         if polygons is None or len(polygons) == 0:
             return False
-        
+            
         try:
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = TEXT_FONT_SCALE
-            font_color = TEXT_FONT_COLOR
-            thickness = TEXT_FONT_THICKNESS
-            
-            print(f"[ImageProcessor] Starting to draw translations on {len(polygons)} regions")
-            print(f"[ImageProcessor] Image shape: {image.shape}")
-            print(f"[ImageProcessor] Recognized texts: {len(recognized_texts)}")
-            
-            # First pass: calculate all bounding boxes
-            bboxes = []
             img_h, img_w = image.shape[:2]
+
+            # -----------------------------------------------------------
+            # STEP 1: Global Erase original Korean text via inpainting
+            # -----------------------------------------------------------
+            inpaint_mask = np.zeros((img_h, img_w), dtype=np.uint8)
+            for poly in polygons:
+                if not isinstance(poly, np.ndarray):
+                    poly = np.array(poly, dtype=np.float32)
+                pts = np.round(poly).astype(np.int32)
+                cv2.fillPoly(inpaint_mask, [pts], 255)
             
+            # Dilate once for all regions
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+            inpaint_mask = cv2.dilate(inpaint_mask, kernel, iterations=1)
+
+            # Perform global inpainting on the whole image buffer
+            image[:] = cv2.inpaint(image, inpaint_mask, inpaintRadius=3,
+                                   flags=cv2.INPAINT_TELEA)
+
+            # Convert cleaned buffer to PIL Image for rendering
+            pil_img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            draw = ImageDraw.Draw(pil_img)
+
+            # Load custom font
+            try:
+                font = ImageFont.truetype(CUSTOM_FONT_PATH, TEXT_FONT_SIZE)
+            except Exception as e:
+                print(f"[ImageProcessor] Failed to load custom font from {CUSTOM_FONT_PATH}: {e}")
+                font = ImageFont.load_default()
+            
+            # Track all render rects so we can detect and resolve overlaps
+            placed_rects: List[Tuple[int, int, int, int]] = []  # (x1,y1,x2,y2)
+
+            def _rects_overlap(a, b):
+                """True if two (x1,y1,x2,y2) rects intersect."""
+                return not (a[2] <= b[0] or b[2] <= a[0] or
+                            a[3] <= b[1] or b[3] <= a[1])
+
+            def _resolve_rect_overlap(rx1, ry1, rx2, ry2):
+                rh = ry2 - ry1
+                candidate = (rx1, ry1, rx2, ry2)
+                if not any(_rects_overlap(candidate, p) for p in placed_rects):
+                    return candidate
+                # Try nudging
+                for dy in range(4, rh + 1, 4):
+                    shifted = (rx1, ry1 + dy, rx2, ry2 + dy)
+                    if shifted[3] <= img_h and not any(_rects_overlap(shifted, p) for p in placed_rects):
+                        return shifted
+                for dy in range(4, rh + 1, 4):
+                    shifted = (rx1, ry1 - dy, rx2, ry2 - dy)
+                    if shifted[1] >= 0 and not any(_rects_overlap(shifted, p) for p in placed_rects):
+                        return shifted
+                return None
+
+            # -----------------------------------------------------------
+            # STEP 2: Render English translations on the cleaned image
+            # -----------------------------------------------------------
             for idx, poly in enumerate(polygons):
-                # Ensure poly is numpy array and convert to float first, then int
                 if not isinstance(poly, np.ndarray):
                     poly = np.array(poly, dtype=np.float32)
                 else:
                     poly = poly.astype(np.float32)
-                
-                # Get bounding box from polygon - round to nearest integer
+                    
                 xs = np.round(poly[:, 0]).astype(int)
                 ys = np.round(poly[:, 1]).astype(int)
-                x_min = int(np.min(xs))
-                x_max = int(np.max(xs))
-                y_min = int(np.min(ys))
-                y_max = int(np.max(ys))
-                
-                # Clamp to image bounds
-                x_min = max(0, min(x_min, img_w - 1))
-                x_max = max(x_min + 1, min(x_max, img_w))
-                y_min = max(0, min(y_min, img_h - 1))
-                y_max = max(y_min + 1, min(y_max, img_h))
-                
-                bboxes.append((x_min, y_min, x_max, y_max))
-            
-            for idx, poly in enumerate(polygons):
-                # Ensure poly is numpy array and convert to float first, then int
-                if not isinstance(poly, np.ndarray):
-                    poly = np.array(poly, dtype=np.float32)
-                else:
-                    poly = poly.astype(np.float32)
-                
-                # Get bounding box from polygon - round to nearest integer
-                xs = np.round(poly[:, 0]).astype(int)
-                ys = np.round(poly[:, 1]).astype(int)
-                x_min = int(np.min(xs))
-                x_max = int(np.max(xs))
-                y_min = int(np.min(ys))
-                y_max = int(np.max(ys))
-                
-                # Clamp to image bounds
-                img_h, img_w = image.shape[:2]
-                x_min = max(0, min(x_min, img_w - 1))
-                x_max = max(x_min + 1, min(x_max, img_w))
-                y_min = max(0, min(y_min, img_h - 1))
-                y_max = max(y_min + 1, min(y_max, img_h))
+                x_min = max(0, min(int(np.min(xs)), img_w - 1))
+                x_max = max(x_min + 1, min(int(np.max(xs)), img_w))
+                y_min = max(0, min(int(np.min(ys)), img_h - 1))
+                y_max = max(y_min + 1, min(int(np.max(ys)), img_h))
                 
                 w = x_max - x_min
                 h = y_max - y_min
                 
-                print(f"[ImageProcessor] Region {idx}: resolved bbox=({x_min},{y_min},{w},{h}), image shape={image.shape}")
-                
-                # Fill with white
-                image[y_min:y_max, x_min:x_max] = [255, 255, 255]
-                
-                # Get the Korean text for this polygon
+                # Get translated text
                 translated_text = ""
-                korean_text = ""
                 if idx < len(recognized_texts):
                     text_item = recognized_texts[idx]
-                    # Handle both dict and string formats
-                    if isinstance(text_item, dict):
-                        korean_text = text_item.get("text", "")
-                    else:
-                        korean_text = str(text_item)
-                    
+                    korean_text = text_item.get("text", "") if isinstance(text_item, dict) else str(text_item)
                     translated_text = translations.get(korean_text, "")
-                    print(f"[ImageProcessor] Region {idx}: bbox=({x_min},{y_min},{w},{h}), '{korean_text}' -> '{translated_text}'")
-                else:
-                    print(f"[ImageProcessor] Region {idx}: No corresponding recognized text (idx {idx} >= {len(recognized_texts)})")
                 
                 if not translated_text:
-                    print(f"[ImageProcessor] Region {idx}: Skipping - no translation found")
                     continue
-                
-                # Split text into lines
+
+                # Build word-wrapped lines
                 words = translated_text.split()
                 lines = []
                 current_line = ""
-                
                 for word in words:
                     test_line = current_line + (" " if current_line else "") + word
-                    text_size = cv2.getTextSize(test_line, font, font_scale, thickness)[0]
-                    
-                    if text_size[0] > w - 10:
-                        if current_line:
-                            lines.append(current_line)
+                    bbox = font.getbbox(test_line)
+                    text_w = bbox[2] - bbox[0]
+                    if text_w > w - 10 and current_line:
+                        lines.append(current_line)
                         current_line = word
                     else:
                         current_line = test_line
-                
                 if current_line:
                     lines.append(current_line)
-                
-                # Draw lines centered
-                line_height = TEXT_LINE_HEIGHT
+
+                # Compute the render rect
+                line_height = int(TEXT_FONT_SIZE * TEXT_LINE_HEIGHT_MULTIPLIER)
                 total_text_height = len(lines) * line_height
-                y_offset = y_min + (h - total_text_height) // 2 + line_height // 2
-                
+                ry1 = y_min + (h - total_text_height) // 2
+                render_rect = (x_min, ry1, x_max, ry1 + total_text_height)
+
+                # Resolve overlaps
+                resolved = _resolve_rect_overlap(*render_rect)
+                if resolved is None:
+                    print(f"[ImageProcessor] Skipping region {idx} — no non-overlapping position found")
+                    continue
+
+                rx1, ry1, rx2, ry2 = resolved
+                y_offset = ry1
                 for line in lines:
-                    if y_offset + line_height > y_max:
-                        break
-                    text_size = cv2.getTextSize(line, font, font_scale, thickness)[0]
-                    x_centered = x_min + (w - text_size[0]) // 2
-                    
-                    cv2.putText(
-                        image,
-                        line,
+                    bbox = font.getbbox(line)
+                    text_w = bbox[2] - bbox[0]
+                    x_centered = rx1 + ((rx2 - rx1) - text_w) // 2
+                    draw.text(
                         (x_centered, y_offset),
-                        font,
-                        font_scale,
-                        font_color,
-                        thickness,
+                        line,
+                        font=font,
+                        fill=TEXT_FONT_COLOR,
+                        stroke_width=TEXT_STROKE_WIDTH,
+                        stroke_fill=TEXT_STROKE_COLOR,
                     )
                     y_offset += line_height
-            
+
+                placed_rects.append(resolved)
+
+            # Finalize: PIL → OpenCV buffer
+            image[:] = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
             return True
+            
         except Exception as e:
             print(f"[ImageProcessor] Error drawing translations: {e}")
             return False

@@ -1,6 +1,8 @@
 """Text detection and recognition using PaddleOCR."""
 
 import json
+import re
+import unicodedata
 from typing import Dict, List, Optional, Tuple
 import numpy as np
 from pathlib import Path
@@ -12,6 +14,66 @@ import cv2
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import DETECTION_CONFIDENCE_THRESHOLD, RECOGNITION_CONFIDENCE_THRESHOLD
 
+# ---------------------------------------------------------------------------
+# Spam / watermark filtering
+# ---------------------------------------------------------------------------
+# Known watermark keyword fragments (case-insensitive, matched as substrings)
+_SPAM_KEYWORDS = [
+    "newtoki",
+    "fastest webtoon",
+    "webtoon provider",
+    "web provider",
+    "provider site",
+    "fastest web",
+    "manhwa18",
+    "toonily",
+    "webtoons.com",
+    "mangadex",
+    "manganelo",
+    "manhwatop",
+    "manhwaclan",
+    "manhwa.live",
+    "leviatanscans",
+    "asurascans",
+    "reaper scans",
+]
+
+# Hangul Unicode block: AC00–D7A3 (syllables) + 1100–11FF (jamo)
+_HANGUL_RE = re.compile(r'[\uAC00-\uD7A3\u1100-\u11FF\u3130-\u318F]')
+
+
+def _is_spam(text: str) -> bool:
+    """
+    Return True if the recognized text looks like a watermark / advertisement
+    snippet rather than real manhwa dialogue.
+
+    Heuristics
+    ----------
+    1. Text contains a known watermark keyword.
+    2. Text has no Hangul characters AND is mostly printable ASCII  
+       (e.g. URLs, English phrases embedded as ads).
+    """
+    if not text or not text.strip():
+        return False
+
+    lower = text.lower()
+
+    # Rule 1 – explicit keyword blocklist
+    if any(kw in lower for kw in _SPAM_KEYWORDS):
+        print(f"[TextDetector][SPAM] Blocked by keyword: '{text}'")
+        return True
+
+    # Rule 2 – no Hangul and predominantly ASCII
+    hangul_count = len(_HANGUL_RE.findall(text))
+    if hangul_count == 0:
+        ascii_count = sum(1 for c in text if ord(c) < 128 and c.isprintable())
+        # If >60 % of chars are printable ASCII and there's no Hangul → likely spam
+        if len(text) > 0 and ascii_count / len(text) > 0.6:
+            print(f"[TextDetector][SPAM] Blocked non-Korean ASCII text: '{text}'")
+            return True
+
+    return False
+
 
 class TextDetector:
     """Detects and recognizes text regions in images using PaddleOCR."""
@@ -20,8 +82,8 @@ class TextDetector:
         """Initialize the text detection and recognition models."""
         try:
             from paddleocr import TextDetection, TextRecognition
-            self.det_model = TextDetection(model_name="PP-OCRv5_mobile_det")
-            self.rec_model = TextRecognition(model_name="korean_PP-OCRv5_mobile_rec")
+            self.det_model = TextDetection(model_name="PP-OCRv5_mobile_det", device='gpu')
+            self.rec_model = TextRecognition(model_name="korean_PP-OCRv5_mobile_rec", device='gpu')
             print("[TextDetector] Models loaded successfully")
         except Exception as e:
             print(f"[TextDetector] Error loading models: {e}")
@@ -133,12 +195,18 @@ class TextDetector:
 
                         # Only keep if recognition confidence above threshold
                         if rec_confidence > recognition_threshold:
-                            recognized_texts.append({"text": text, "confidence": float(rec_confidence)})
-                            valid_polys.append(poly)
-                            kept_count += 1
-                            print(
-                                f"[TextDetector] Recognized: '{text}' (det: {det_confidence:.3f}, rec: {rec_confidence:.3f})"
-                            )
+                            # Filter out watermarks / advertisements
+                            if _is_spam(text):
+                                print(
+                                    f"[TextDetector] Filtered spam/watermark: '{text}'"
+                                )
+                            else:
+                                recognized_texts.append({"text": text, "confidence": float(rec_confidence)})
+                                valid_polys.append(poly)
+                                kept_count += 1
+                                print(
+                                    f"[TextDetector] Recognized: '{text}' (det: {det_confidence:.3f}, rec: {rec_confidence:.3f})"
+                                )
                         else:
                             print(
                                 f"[TextDetector] Skipped: '{text}' (rec: {rec_confidence:.3f}) - below threshold {recognition_threshold}"

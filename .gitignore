@@ -16,3 +16,11 @@ cache/
 
 *.ipynb
 output/
+
+CLAUDE.md
+
+test*.py  
+test*.jpg
+captcha.png
+*.db
+series*
